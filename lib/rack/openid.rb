@@ -3,7 +3,6 @@ require 'rack/utils'
 
 require 'openid'
 require 'openid/consumer'
-require 'openid/extensions/sreg'
 require 'openid/extensions/ax'
 require 'openid/extensions/oauth'
 
@@ -121,12 +120,11 @@ module Rack #:nodoc:
 
         begin
           oidreq = consumer.begin(identifier)
-          add_simple_registration_fields(oidreq, params)
           add_attribute_exchange_fields(oidreq, params)
           add_oauth_fields(oidreq, params)
           url = open_id_redirect_url(req, oidreq, params["trust_root"], params["return_to"], params["method"], immediate)
           return redirect_to(url)
-        rescue ::OpenID::OpenIDError, Timeout::Error => e
+        rescue ::OpenID::OpenIDError, Timeout::Error
           env[RESPONSE] = MissingResponse.new
           return @app.call(env)
         end
@@ -219,21 +217,6 @@ module Rack #:nodoc:
         method = method.to_s.downcase
         oidreq.return_to_args['_method'] = method unless method == "get"
         oidreq.redirect_url(trust_root || realm_url(req), return_to || request_url, immediate)
-      end
-
-      def add_simple_registration_fields(oidreq, fields)
-        sregreq = ::OpenID::SReg::Request.new
-
-        required = Array(fields['required']).reject(&URL_FIELD_SELECTOR)
-        sregreq.request_fields(required, true) if required.any?
-
-        optional = Array(fields['optional']).reject(&URL_FIELD_SELECTOR)
-        sregreq.request_fields(optional, false) if optional.any?
-
-        policy_url = fields['policy_url']
-        sregreq.policy_url = policy_url if policy_url
-
-        oidreq.add_extension(sregreq)
       end
 
       def add_attribute_exchange_fields(oidreq, fields)
